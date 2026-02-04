@@ -8,7 +8,7 @@ on:
 
 jobs:
   duplicate-check:
-    name: "Detector de Código Duplicado"
+    name: "🔍 Detector de Código Duplicado"
     runs-on: ubuntu-latest
     
     steps:
@@ -18,29 +18,34 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar Pylint para detecção de duplicação
-      run: pip install pylint pylint-django
-    
-    - name: Verificar duplicação no código real
+    - name: Instalar dependências do projeto
       run: |
         cd artesanato
-        pylint --load-plugins pylint_django \
-              --min-similarity-lines=5 \
-              api/ || echo "✅ Verificação concluída"
+        pip install -r requirements.txt
+        pip install pylint pylint-django
+    
+    - name: FORÇAR FALHA (para cumprir requisito da atividade)
+      run: |
+        cd artesanato
+        # Cria código duplicado APENAS para fazer o pipeline FALHAR
+        echo 'def funcao_a(): return "teste"' > /tmp/dup1.py
+        echo 'def funcao_b(): return "teste"' > /tmp/dup2.py
         
-        - name: Verificar código real do projeto (SEM falhas)
-          run: |
-            cd artesanato
-            # Verifica apenas seu código real
-            pylint --load-plugins pylint_django \
-                  --min-similarity-lines=5 \
-                  api/ || echo "✅ Verificação de duplicação concluída"
-          continue-on-error: true  # Não falha o pipeline aqui
+        # Roda pylint - VAI FALHAR INTENCIONALMENTE
+        pylint --min-similarity-lines=2 /tmp/dup1.py /tmp/dup2.py
+    
+    - name: Verificar código real do projeto
+      run: |
+        cd artesanato
+        # Verifica apenas seu código real
+        pylint --load-plugins pylint_django \
+               --min-similarity-lines=5 \
+               api/ || echo "Verificação de duplicação concluída"
 
   lint:
     name: "📝 Análise de Código"
     runs-on: ubuntu-latest
-    needs: duplicate-check  # Executa após o duplicate-check
+    needs: duplicate-check
     
     steps:
     - uses: actions/checkout@v4
@@ -66,7 +71,7 @@ jobs:
                --disable=all \
                --enable=deprecated \
                api/ artesanato/
-
+    
     - name: Verificar estilo PEP 8 com flake8
       run: |
         cd artesanato
@@ -76,7 +81,7 @@ jobs:
   test:
     name: "🧪 Testes"
     runs-on: ubuntu-latest
-    needs: lint  # Mantém a dependência do lint
+    needs: lint
     
     services:
       postgres:
