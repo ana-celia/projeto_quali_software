@@ -7,8 +7,30 @@ on:
     branches: [ main ]
 
 jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Instalar pylint
+      run: |
+        cd artesanato
+        pip install pylint pylint-django
+    
+    - name: Verificar código deprecated
+      run: |
+        cd artesanato
+        pylint --load-plugins pylint_django \
+               --fail-on=deprecated \
+               api/ artesanato/
+  
   test:
     runs-on: ubuntu-latest
+    needs: lint  # Só roda se lint passar
     
     services:
       postgres:
@@ -25,13 +47,10 @@ jobs:
           - 5432:5432
 
     steps:
-    - name: Checkout código
-      uses: actions/checkout@v4
+    - uses: actions/checkout@v4
     
-    - name: Configurar Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
+    - uses: actions/setup-python@v5
+      with: { python-version: '3.12' }
     
     - name: Instalar dependências
       run: |
@@ -45,7 +64,7 @@ jobs:
       env:
         DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
     
-    - name: Rodar testes (se tiver)
+    - name: Rodar testes
       run: |
         cd artesanato
         python manage.py test
