@@ -16,6 +16,11 @@ jobs:
       with:
         python-version: '3.12'
     
+    - name: Instalar dependências do projeto
+      run: |
+        cd artesanato
+        pip install -r requirements.txt
+    
     - name: Instalar pylint
       run: |
         cd artesanato
@@ -24,7 +29,10 @@ jobs:
     - name: Verificar código deprecated
       run: |
         cd artesanato
+        # Agora Django está instalado, pylint consegue analisar
         pylint --load-plugins pylint_django \
+               --disable=all \
+               --enable=deprecated \
                --fail-on=deprecated \
                api/ artesanato/
   
