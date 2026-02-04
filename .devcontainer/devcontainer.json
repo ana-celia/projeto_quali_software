@@ -1,9 +1,9 @@
 {
   "name": "Artesanato Django",
   "image": "mcr.microsoft.com/devcontainers/python:3.12",
-  "workspaceFolder": "/workspace/artesanato",
+  "workspaceFolder": "/artesanato",
   "forwardPorts": [8000],
-  "postCreateCommand": "pip install -r /workspace/artesanato/requirements.txt",
+  "postCreateCommand": "pip install -r /artesanato/requirements.txt",
   "customizations": {
     "vscode": {
       "extensions": ["ms-python.python"]
