@@ -1,0 +1,24 @@
+{
+  "name": "Artesanato Django",
+  "image": "python:3.12-slim",
+  
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.12"
+    }
+  },
+  
+  "forwardPorts": [8000],
+  
+  "postCreateCommand": "apt-get update && apt-get install -y postgresql-client && pip install --upgrade pip && pip install -r requirements.txt",
+  
+  "customizations": {
+    "vscode": {
+      "extensions": ["ms-python.python"]
+    }
+  },
+  
+  "remoteEnv": {
+    "DATABASE_URL": "postgresql://postgres:9061@host.docker.internal:5432/artesanato"
+  }
+}
