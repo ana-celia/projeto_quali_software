@@ -24,23 +24,15 @@ jobs:
         pip install -r requirements.txt
         pip install pylint pylint-django
     
-    - name: FORÇAR FALHA (para cumprir requisito da atividade)
-      run: |
-        cd artesanato
-        # Cria código duplicado APENAS para fazer o pipeline FALHAR
-        echo 'def funcao_a(): return "teste"' > /tmp/dup1.py
-        echo 'def funcao_b(): return "teste"' > /tmp/dup2.py
-        
-        # Roda pylint - VAI FALHAR INTENCIONALMENTE
-        pylint --min-similarity-lines=2 /tmp/dup1.py /tmp/dup2.py
-    
-    - name: Verificar código real do projeto
+    - name: Verificar código duplicado
       run: |
         cd artesanato
         # Verifica apenas seu código real
-        pylint --load-plugins pylint_django \
+        python -c "import sys; print('🔍 Verificando código duplicado com Pylint...')"
+        python -m pylint --load-plugins pylint_django \
                --min-similarity-lines=5 \
-               api/ || echo "Verificação de duplicação concluída"
+               api/
+      continue-on-error: false  # Se encontrar duplicação, falha mesmo
 
   lint:
     name: "📝 Análise de Código"
@@ -67,7 +59,7 @@ jobs:
     - name: Verificar código deprecated
       run: |
         cd artesanato
-        pylint --load-plugins pylint_django \
+        python -m pylint --load-plugins pylint_django \
                --disable=all \
                --enable=deprecated \
                api/ artesanato/
