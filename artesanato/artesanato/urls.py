@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.urls import path, include
 from rest_framework import routers
-from api.views import *
+from api.views import ClienteViewSet, EnderecoViewSet, ServicoViewSet, PedidoViewSet, RelacaoViewSet
 from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
 
 routerServicos = routers.DefaultRouter()

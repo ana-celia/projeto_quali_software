@@ -1,5 +1,6 @@
 from django.db import models
 
+
 class Cliente(models.Model):
     nome = models.CharField(max_length=250)
     telefone = models.IntegerField()
@@ -7,6 +8,7 @@ class Cliente(models.Model):
 
     def __str__(self):
         return self.nome
+
 
 class Endereco(models.Model):
     rua = models.CharField(max_length=250)
@@ -20,6 +22,7 @@ class Endereco(models.Model):
     def __str__(self):
         return self.rua
 
+
 class Servico(models.Model):
     nome = models.CharField(max_length=250)
     valor = models.FloatField()
@@ -27,6 +30,7 @@ class Servico(models.Model):
 
     def __str__(self):
         return self.nome
+
 
 class FormaPagamento(models.Model):
     nome = models.CharField(max_length=250)
@@ -36,8 +40,9 @@ class FormaPagamento(models.Model):
     def __str__(self):
         return self.nome
 
+
 class Pedido(models.Model):
-    SITUACAO = (("pg","pago"), ("op", "aberto"), ("cc", "cancelado"))
+    SITUACAO = (("pg", "pago"), ("op", "aberto"), ("cc", "cancelado"))
     situacaoPedido = models.CharField(max_length=250, choices=SITUACAO)
     descricao = models.CharField(max_length=500)
     valorAssociado = models.FloatField()
@@ -52,12 +57,13 @@ class Pedido(models.Model):
     def __str__(self):
         return self.situacaoPedido
 
+
 class Relacao(models.Model):
     TIPOS = (("ia", "Indicação amigos"), ("if", "Indicação familia"), ("rs", "Redes Sociais"))
     pessoa1 = models.ForeignKey(Cliente, on_delete=models.CASCADE, related_name="Relacionamento")
     pessoa2 = models.ForeignKey(Cliente, on_delete=models.CASCADE)
     tipo = models.CharField(max_length=250, choices=TIPOS)
     parentesco = models.CharField(max_length=250)
-            
+
     def __str__(self):
         return f"{self.pessoa1.nome} + {self.pessoa2.nome}"
