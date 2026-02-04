@@ -1,5 +1,7 @@
 [MASTER]
 load-plugins=pylint_django
+enable=duplicate-code
+min-duplicate-lines = 3
 
 [MESSAGES CONTROL]
 enable=all
@@ -17,3 +19,9 @@ max-nested-blocks=5
 
 [TYPECHECK]
 generated-members=objects
+
+[SIMILARITIES]
+min-similarity-lines = 3
+ignore-comments = yes
+ignore-docstrings = yes
+ignore-imports = yes
