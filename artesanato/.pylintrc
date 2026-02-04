@@ -1,0 +1,19 @@
+[MASTER]
+load-plugins=pylint_django
+
+[MESSAGES CONTROL]
+enable=all
+disable=missing-docstring,too-few-public-methods
+
+[DESIGN]
+max-args=10
+max-locals=20
+
+[FORMAT]
+max-line-length=100
+
+[REFACTOR]
+max-nested-blocks=5
+
+[TYPECHECK]
+generated-members=objects
