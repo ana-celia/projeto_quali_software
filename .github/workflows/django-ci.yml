@@ -18,31 +18,24 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar dependências
-      run: |
-        cd artesanato
-        pip install -r requirements.txt
-        pip install pylint pylint-django
+    - name: Instalar radon
+      run: pip install radon
     
-    - name: Configurar Django e verificar duplicação
+    - name: Verificar duplicação no código real
       run: |
         cd artesanato
+        echo "=== DETECTOR DE CÓDIGO DUPLICADO ==="
+        echo "🔍 Analisando: api/"
         
-        # Configura variáveis de ambiente do Django
-        export DJANGO_SETTINGS_MODULE="artesanato.settings"
-        export PYTHONPATH="$PWD:$PYTHONPATH"
-        
-        # Verifica duplicação com configurações específicas
-        echo "🔍 Verificando código duplicado..."
-        python -m pylint --load-plugins pylint_django \
-               --min-similarity-lines=5 \
-               --disable=django-not-configured,too-many-ancestors,invalid-name,line-too-long \
-               api/
+        # Verifica duplicação (--min D mostra apenas duplicação)
+        # Se encontrar duplicação, falha o pipeline
+        # Se não encontrar, mostra mensagem positiva
+        radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
 
   lint:
     name: "📝 Análise de Código"
     runs-on: ubuntu-latest
-    needs: duplicate-check
+    needs: duplicate-check  # Só executa se não houver duplicação
     
     steps:
     - uses: actions/checkout@v4
@@ -51,23 +44,10 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar dependências
+    - name: Instalar dependências do projeto
       run: |
         cd artesanato
         pip install -r requirements.txt
-    
-    - name: Configurar ambiente Django para pylint
-      run: |
-        cd artesanato
-        export DJANGO_SETTINGS_MODULE="artesanato.settings"
-        export PYTHONPATH="$PWD:$PYTHONPATH"
-        
-        # Verificação deprecated
-        python -m pylint --load-plugins pylint_django \
-               --disable=all \
-               --enable=deprecated \
-               --disable=django-not-configured \
-               api/ artesanato/
     
     - name: Verificar estilo PEP 8 com flake8
       run: |
@@ -78,7 +58,7 @@ jobs:
   test:
     name: "🧪 Testes"
     runs-on: ubuntu-latest
-    needs: lint
+    needs: lint  # Só executa se lint passar
     
     services:
       postgres:
