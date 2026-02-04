@@ -35,6 +35,12 @@ jobs:
                --enable=deprecated \
                --fail-on=deprecated \
                api/ artesanato/
+               
+    - name: Verificar estilo PEP 8 com flake8
+      run: |
+        cd artesanato
+        pip install flake8
+        flake8 . --count --statistics
   
   test:
     runs-on: ubuntu-latest
