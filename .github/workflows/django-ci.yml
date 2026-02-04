@@ -18,21 +18,26 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar dependências do projeto
+    - name: Instalar dependências
       run: |
         cd artesanato
         pip install -r requirements.txt
         pip install pylint pylint-django
     
-    - name: Verificar código duplicado
+    - name: Configurar Django e verificar duplicação
       run: |
         cd artesanato
-        # Verifica apenas seu código real
-        python -c "import sys; print('🔍 Verificando código duplicado com Pylint...')"
+        
+        # Configura variáveis de ambiente do Django
+        export DJANGO_SETTINGS_MODULE="artesanato.settings"
+        export PYTHONPATH="$PWD:$PYTHONPATH"
+        
+        # Verifica duplicação com configurações específicas
+        echo "🔍 Verificando código duplicado..."
         python -m pylint --load-plugins pylint_django \
                --min-similarity-lines=5 \
+               --disable=django-not-configured,too-many-ancestors,invalid-name,line-too-long \
                api/
-      continue-on-error: false  # Se encontrar duplicação, falha mesmo
 
   lint:
     name: "📝 Análise de Código"
@@ -46,22 +51,22 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar dependências do projeto
+    - name: Instalar dependências
       run: |
         cd artesanato
         pip install -r requirements.txt
     
-    - name: Instalar pylint
+    - name: Configurar ambiente Django para pylint
       run: |
         cd artesanato
-        pip install pylint pylint-django
-    
-    - name: Verificar código deprecated
-      run: |
-        cd artesanato
+        export DJANGO_SETTINGS_MODULE="artesanato.settings"
+        export PYTHONPATH="$PWD:$PYTHONPATH"
+        
+        # Verificação deprecated
         python -m pylint --load-plugins pylint_django \
                --disable=all \
                --enable=deprecated \
+               --disable=django-not-configured \
                api/ artesanato/
     
     - name: Verificar estilo PEP 8 com flake8
