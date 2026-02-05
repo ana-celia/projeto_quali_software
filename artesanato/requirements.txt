@@ -6,3 +6,5 @@ tzdata==2025.2
 typing-extensions==4.13.2
 drf-spectacular==0.29.0
 psycopg2-binary==2.9.11
+django-extensions>=3.2.3 
+pydotplus>=2.0.2
