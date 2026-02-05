@@ -2,25 +2,24 @@ name: Django CI
 
 on:
   push:
-    branches: [ '**' ]
+    branches: ['**']
   pull_request:
-    branches: [ '**' ]
+    branches: ['**']
 
 jobs:
   duplicate-check:
     name: "🔍 Detector de Código Duplicado"
     runs-on: ubuntu-latest
-    
+
     steps:
     - uses: actions/checkout@v4
-    
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
+
     - name: Instalar radon
       run: pip install radon
-    
+
     - name: Verificar duplicação no código real
       run: |
         cd artesanato
@@ -28,34 +27,108 @@ jobs:
         echo "🔍 Analisando: api/"
         radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
 
-  lint:
-    name: "📝 Análise de Código"
+  code-smells-check:
+    name: "👃 Detector de Code Smells"
     runs-on: ubuntu-latest
-    needs: duplicate-check
-    
+
     steps:
     - uses: actions/checkout@v4
-    
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
+
+    - name: Instalar ferramentas de análise
+      run: |
+        pip install pylint pylint-django radon
+
+    - name: Executar análise de code smells
+      run: |
+        cd artesanato
+        
+        echo "🚀 ANALISANDO CODE SMELLS"
+        echo "=========================="
+
+        # Configurar Django
+        export DJANGO_SETTINGS_MODULE="artesanato.settings"
+        export PYTHONPATH="$PWD:$PYTHONPATH"
+
+        # Analisar com Pylint e pegar os 3 mais frequentes
+        echo -e "\n🔍 Buscando os 3 code smells mais frequentes..."
+
+        # Executar Pylint e processar resultados
+        pylint --load-plugins pylint_django --output-format=json api/ 2>/dev/null | python3 -c " import json, collections
+
+        try:
+            import sys
+            data = json.load(sys.stdin)
+
+            if not data:
+                print('✅ Nenhum code smell encontrado!')
+                sys.exit(0)
+
+            # Contar frequência
+            counts = collections.Counter(item['symbol'] for item in data)
+
+            print(f'📊 Total de code smells: {len(data)}')
+            print(f'🔍 Tipos diferentes: {len(counts)}')
+
+            # Top 3
+            top_3 = counts.most_common(3)
+
+            print('\n🏆 TOP 3 CODE SMELLS:')
+            print('====================')
+
+            for i, (symbol, count) in enumerate(top_3, 1):
+                print(f'\n{i}º - {symbol} ({count} ocorrências)')
+
+                # Mostrar primeiro exemplo
+                for item in data:
+                    if item['symbol'] == symbol:
+                        filename = item['path'].split('/')[-1]
+                        print(f'   📍 {filename}:{item[\"line\"]} - {item[\"message\"][:80]}...')
+                        break
+
+            print('\n✅ Análise concluída')
+
+        except Exception as e:
+            print('❌ Erro na análise:', str(e))
+            print('\nExecutando análise simples...')
+            import subprocess
+            result = subprocess.run(['pylint', '--load-plugins', 'pylint_django', 'api/'], 
+                                  capture_output=True, text=True)
+            print(result.stdout[:500])
+        " || echo "⚠️  Análise completa disponível nos logs"
+
+                echo -e "\n=========================="
+                echo "✅ ANÁLISE CONCLUÍDA"
+
+  lint:
+    name: "📝 Análise de Código"
+    runs-on: ubuntu-latest
+    needs: code-smells-check
+
+    steps:
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
     - name: Instalar dependências do projeto
       run: |
         cd artesanato
         pip install -r requirements.txt
-    
+
     - name: Verificar estilo PEP 8 com flake8
       run: |
         cd artesanato
         pip install flake8
         flake8 . --count --statistics
-  
+
   test:
     name: "🧪 Testes"
     runs-on: ubuntu-latest
     needs: lint
-    
+
     services:
       postgres:
         image: postgres:15
@@ -72,29 +145,29 @@ jobs:
 
     steps:
     - uses: actions/checkout@v4
-    
     - uses: actions/setup-python@v5
-      with: { python-version: '3.12' }
-    
+      with:
+        python-version: '3.12'
+
     - name: Instalar dependências
       run: |
         cd artesanato
         pip install -r requirements.txt
-    
+
     - name: Rodar migrações
       run: |
         cd artesanato
         python manage.py migrate
       env:
         DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
-    
+
     - name: Rodar testes
       run: |
         cd artesanato
         python manage.py test
       env:
         DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
-    
+
     - name: Verificar sintaxe Django
       run: |
         cd artesanato
@@ -103,33 +176,33 @@ jobs:
   uml-diagram:
     name: "📊 Gerar Diagrama UML"
     runs-on: ubuntu-latest
-    needs: test  # ⬅️ AGORA test JÁ EXISTE!
-    
+    needs: test
+
     steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
+
     - name: Instalar Graphviz
       run: sudo apt-get update && sudo apt-get install -y graphviz
-    
+
     - name: Instalar dependências Python
       run: |
         cd artesanato
         pip install -r requirements.txt django-extensions pydotplus
-    
+
     - name: Gerar diagrama UML
       run: |
         cd artesanato
-        
+
         # Configurar Django
         export DJANGO_SETTINGS_MODULE="artesanato.settings"
         export PYTHONPATH="$PWD:$PYTHONPATH"
-        
+
         # Criar diretório
         mkdir -p docs
-        
+
         # Gerar diagrama
         echo "📊 Gerando diagrama UML com pydotplus..."
         python manage.py graph_models api \
@@ -137,7 +210,7 @@ jobs:
           --theme django2018 \
           --group-models \
           --arrow-shape normal
-        
+
         # Verificar se gerou
         if [ -f "docs/class_diagram.png" ]; then
           echo "✅ Diagrama gerado com sucesso!"
@@ -147,7 +220,7 @@ jobs:
           python manage.py graph_models api --dot > docs/class_diagram.dot
           dot -Tpng docs/class_diagram.dot -o docs/class_diagram.png
         fi
-    
+
     - name: Upload diagrama
       uses: actions/upload-artifact@v4
       with:

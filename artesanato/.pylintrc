@@ -11,7 +11,7 @@ max-args=10
 max-locals=20
 
 [FORMAT]
-max-line-length=100
+max-line-length=100.  # PEP 8 recomenda 79, mas 120 é mais prático hoje em dia.
 
 [REFACTOR]
 max-nested-blocks=5
@@ -24,3 +24,7 @@ min-similarity-lines = 3
 ignore-comments = yes
 ignore-docstrings = yes
 ignore-imports = yes
+
+# OU melhor: ignore migrations completamente
+#[MASTER]
+#ignore-patterns = ^migrations/.*\.py$
