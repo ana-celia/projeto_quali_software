@@ -34,3 +34,9 @@ staticfiles/
 
 # Database
 *.sqlite3
+
+# Adicione estas linhas no .gitignore
+.env
+.env.local
+.env.*.local
+*.env
