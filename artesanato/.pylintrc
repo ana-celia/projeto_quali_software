@@ -1,6 +1,7 @@
 [MASTER]
 load-plugins=pylint_django
 
+
 [MESSAGES CONTROL]
 enable=all
 disable=missing-docstring,too-few-public-methods
@@ -17,3 +18,9 @@ max-nested-blocks=5
 
 [TYPECHECK]
 generated-members=objects
+
+[SIMILARITIES]
+min-similarity-lines = 3 
+ignore-comments = yes
+ignore-docstrings = yes
+ignore-imports = yes
