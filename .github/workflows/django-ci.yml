@@ -2,9 +2,9 @@ name: Django CI
 
 on:
   push:
-    branches: [ '**' ]
+    branches: ['**']
   pull_request:
-    branches: [ '**' ]
+    branches: ['**']
 
 jobs:
   duplicate-check:
@@ -12,94 +12,267 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+    - name: Instalar radon
+      run: pip install radon
 
-      - name: Instalar radon
-        run: pip install radon
+    - name: Verificar duplicação no código real
+      run: |
+        cd artesanato
+        echo "=== DETECTOR DE CÓDIGO DUPLICADO ==="
+        echo "🔍 Analisando: api/"
+        radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
 
-      - name: Verificar duplicação no código real
-        run: |
-          cd artesanato
-          echo "=== DETECTOR DE CÓDIGO DUPLICADO ==="
-          echo "🔍 Analisando: api/"
-          radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
-
-  lint:
-    name: "📝 Análise de Código"
+  code-smells-check:
+    name: "👃 Detector de Code Smells"
     runs-on: ubuntu-latest
-    needs: duplicate-check
 
     steps:
-      - uses: actions/checkout@v4
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+    - name: Instalar ferramentas de análise
+      run: |
+        pip install pylint pylint-django radon
 
-      - name: Instalar dependências do projeto
-        run: |
-          cd artesanato
-          pip install -r requirements.txt
+    - name: Executar análise automática de code smells
+      run: |
+        cd artesanato
+        
+        echo "🚀 INICIANDO ANÁLISE AUTOMÁTICA DE CODE SMELLS"
+        echo "=============================================="
+        
+        # Configurar Django
+        export DJANGO_SETTINGS_MODULE="artesanato.settings"
+        export PYTHONPATH="$PWD:$PYTHONPATH"
+        
+        # 1. EXECUTAR ANÁLISE E COLETAR RESULTADOS
+        echo -e "\n🔍 EXECUTANDO ANÁLISE COM PYLINT..."
+        pylint --load-plugins pylint_django api/ > /tmp/full_analysis.txt 2>&1 || true
+        
+        # 2. GERAR DADOS EM JSON PARA ANÁLISE
+        echo -e "\n📊 PROCESSANDO RESULTADOS..."
+        pylint --load-plugins pylint_django --output-format=json api/ > /tmp/pylint_results.json 2>/dev/null || true
+        
+        # 3. IDENTIFICAR OS 3 PRINCIPAIS CODE SMELLS AUTOMATICAMENTE
+        echo -e "\n🎯 IDENTIFICANDO OS 3 CODE SMELLS MAIS FREQUENTES..."
+        
+        python3 -c "
+        import json
+        import collections
+        import re
 
-      - name: Verificar estilo PEP 8 com flake8
-        run: |
-          cd artesanato
-          pip install flake8
-          flake8 . --count --statistics
+        try:
+            # Ler resultados do Pylint
+            with open('/tmp/pylint_results.json', 'r') as f:
+                data = json.load(f)
+            
+            if not data:
+                print('✅ Nenhum code smell encontrado pelo Pylint!')
+                
+                # Mostrar análise completa de qualquer forma
+                print('\n📄 Análise completa:')
+                with open('/tmp/full_analysis.txt', 'r') as f:
+                    print(f.read()[:1000] + '...' if len(f.read()) > 1000 else f.read())
+                
+                exit(0)
+            
+            # Contar frequência de cada tipo de code smell
+            counts = collections.Counter(item['symbol'] for item in data)
+            
+            print(f'📈 Total de code smells detectados: {len(data)}')
+            print(f'🔍 Tipos distintos de code smells: {len(counts)}')
+            
+            # Obter os 3 mais frequentes
+            top_3 = counts.most_common(3)
+            
+            print('\n' + '='*60)
+            print('🏆 TOP 3 CODE SMELLS MAIS FREQUENTES NO PROJETO:')
+            print('='*60)
+            
+            # Mapear códigos para descrições amigáveis
+            code_descriptions = {
+                'R0901': 'Too many ancestors - Muita herança de classes',
+                'R0902': 'Too many instance attributes - Muitos atributos na classe',
+                'R0903': 'Too few public methods - Poucos métodos públicos',
+                'R0912': 'Too many branches - Muitos if/else/switch',
+                'R0913': 'Too many arguments - Método com muitos parâmetros',
+                'R0914': 'Too many local variables - Muitas variáveis locais',
+                'R0915': 'Too many statements - Método muito longo',
+                'C0103': 'Invalid name - Nome não segue convenção',
+                'C0114': 'Missing module docstring - Falta docstring no módulo',
+                'C0115': 'Missing class docstring - Falta docstring na classe',
+                'C0116': 'Missing function docstring - Falta docstring na função',
+                'C0301': 'Line too long - Linha muito longa',
+                'C0303': 'Trailing whitespace - Espaços em branco no final da linha',
+                'C0304': 'Missing final newline - Falta nova linha no final',
+                'W0611': 'Unused import - Import não utilizado',
+                'W0612': 'Unused variable - Variável não utilizada',
+                'W0613': 'Unused argument - Argumento não utilizado',
+                'E0401': 'Unable to import - Não consegue importar módulo',
+                'E1101': 'Nonexistent member - Membro não existente',
+            }
+            
+            for i, (symbol, count) in enumerate(top_3, 1):
+                description = code_descriptions.get(symbol, 'Code smell não catalogado')
+                print(f'\n{i}º - {symbol}: {description}')
+                print(f'   📍 Ocorrências: {count}')
+                
+                # Mostrar alguns exemplos deste code smell
+                examples = [item for item in data if item['symbol'] == symbol][:2]
+                for ex in examples:
+                    filename = ex['path'].split('/')[-1]
+                    print(f'   📄 {filename}:{ex[\"line\"]} - {ex[\"message\"]}')
+    
+        # 4. MOSTRAR OUTRAS ESTATÍSTICAS
+        print('\n' + '='*60)
+        print('📈 ESTATÍSTICAS COMPLETAS:')
+        print('='*60)
+        
+        # Agrupar por categoria
+        categories = collections.defaultdict(int)
+        for symbol, count in counts.items():
+            # Extrair categoria (primeira letra + número)
+            match = re.match(r'([A-Z])(\d+)', symbol)
+            if match:
+                category = match.group(1)
+                if category == 'R':
+                    categories['Refactor'] += count
+                elif category == 'C':
+                    categories['Convention'] += count
+                elif category == 'W':
+                    categories['Warning'] += count
+                elif category == 'E':
+                    categories['Error'] += count
+                elif category == 'F':
+                    categories['Fatal'] += count
+                else:
+                    categories['Other'] += count
+            else:
+                categories['Other'] += count
+        
+        print('\n📋 Distribuição por categoria:')
+        for category, count in sorted(categories.items()):
+            print(f'   • {category}: {count} code smells')
+        
+        # Score do Pylint
+        if data:
+            last_item = data[-1]
+            if 'type' in last_item and last_item['type'] == 'score':
+                score = last_item['message'].split(' ')[-1].replace('/10', '')
+                print(f'\n⭐ Score do Pylint: {score}/10')
+        
+        # 5. RECOMENDAÇÕES BASEADAS NOS RESULTADOS
+        print('\n' + '='*60)
+        print('💡 RECOMENDAÇÕES DE CORREÇÃO:')
+        print('='*60)
+        
+        recommendations = {
+            'R0901': 'Considere reduzir a cadeia de herança ou usar composição.',
+            'R0902': 'Refatore classes grandes em classes menores (Single Responsibility).',
+            'R0903': 'Classes devem ter comportamentos públicos claros.',
+            'R0913': 'Quebre métodos com muitos parâmetros em métodos menores.',
+            'R0915': 'Métodos muito longos são difíceis de manter. Extraia funções.',
+            'C0103': 'Siga as convenções de nomenclatura (snake_case para funções/variáveis).',
+            'C0114': 'Adicione docstrings para documentar módulos importantes.',
+            'C0301': 'Quebre linhas muito longas para melhor legibilidade.',
+            'W0611': 'Remova imports não utilizados para limpar o código.',
+            'W0612': 'Variáveis não utilizadas podem indicar código morto.',
+        }
+        
+        for symbol, _ in top_3:
+            if symbol in recommendations:
+                print(f'   • Para {symbol}: {recommendations[symbol]}')
+        
+        print('\n' + '='*60)
+        print('✅ ANÁLISE COMPLETA CONCLUÍDA')
+        print('='*60)
+        
+    except Exception as e:
+        print(f'⚠️  Erro ao processar análise: {e}')
+         print('\n📄 Resultado bruto da análise:')
+        with open('/tmp/full_analysis.txt', 'r') as f:
+            content = f.read()
+            print(content[:1500] + '...' if len(content) > 1500 else content)
+            echo -e "\n==========================================="
+            echo "🎯 ANÁLISE DE CODE SMELLS CONCLUÍDA"
+            echo "==========================================="
+      lint:
+        name: "📝 Análise de Código"
+        runs-on: ubuntu-latest
+        needs: code-smells-check
 
-  test:
-    name: "🧪 Testes"
-    runs-on: ubuntu-latest
-    needs: lint
+        steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-python@v5
+          with:
+            python-version: '3.12'
 
-    services:
-      postgres:
-        image: postgres:15
-        env:
-          POSTGRES_PASSWORD: 9061
-          POSTGRES_DB: artesanato
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
+        - name: Instalar dependências do projeto
+          run: |
+            cd artesanato
+            pip install -r requirements.txt
 
-    steps:
-      - uses: actions/checkout@v4
+        - name: Verificar estilo PEP 8 com flake8
+          run: |
+            cd artesanato
+            pip install flake8
+            flake8 . --count --statistics
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+      test:
+        name: "🧪 Testes"
+        runs-on: ubuntu-latest
+        needs: lint
 
-      - name: Instalar dependências
-        run: |
-          cd artesanato
-          pip install -r requirements.txt
+        services:
+          postgres:
+            image: postgres:15
+            env:
+              POSTGRES_PASSWORD: 9061
+              POSTGRES_DB: artesanato
+            options: >-
+              --health-cmd pg_isready
+              --health-interval 10s
+              --health-timeout 5s
+              --health-retries 5
+            ports:
+              - 5432:5432
 
-      - name: Rodar migrações
-        run: |
-          cd artesanato
-          python manage.py migrate
-        env:
-          DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+        steps:
+        - uses: actions/checkout@v4
+        - uses: actions/setup-python@v5
+          with:
+            python-version: '3.12'
 
-      - name: Rodar testes
-        run: |
-          cd artesanato
-          python manage.py test
-        env:
-          DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+        - name: Instalar dependências
+          run: |
+            cd artesanato
+            pip install -r requirements.txt
 
-      - name: Verificar sintaxe Django
-        run: |
-          cd artesanato
-          python manage.py check
+        - name: Rodar migrações
+          run: |
+            cd artesanato
+            python manage.py migrate
+          env:
+            DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+
+        - name: Rodar testes
+          run: |
+            cd artesanato
+            python manage.py test
+          env:
+            DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+
+        - name: Verificar sintaxe Django
+          run: |
+            cd artesanato
+            python manage.py check
 
   uml-diagram:
     name: "📊 Gerar Diagrama UML"
@@ -107,93 +280,50 @@ jobs:
     needs: test
 
     steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
-      - name: Instalar Graphviz
-        run: sudo apt-get update && sudo apt-get install -y graphviz
-
-      - name: Instalar dependências Python
-        run: |
-          cd artesanato
-          pip install -r requirements.txt django-extensions pydotplus
-
-      - name: Gerar diagrama UML
-        run: |
-          cd artesanato
-
-          # Configurar Django
-          export DJANGO_SETTINGS_MODULE="artesanato.settings"
-          export PYTHONPATH="$PWD:$PYTHONPATH"
-
-          # Criar diretório
-          mkdir -p docs
-
-          # Gerar diagrama
-          echo "📊 Gerando diagrama UML com pydotplus..."
-          python manage.py graph_models api \
-            --output docs/class_diagram.png \
-            --theme django2018 \
-            --group-models \
-            --arrow-shape normal
-
-          # Verificar se gerou
-          if [ -f "docs/class_diagram.png" ]; then
-            echo "✅ Diagrama gerado com sucesso!"
-            ls -la docs/class_diagram.png
-          else
-            echo "⚠️  Não gerou PNG, tentando formato DOT..."
-            python manage.py graph_models api --dot > docs/class_diagram.dot
-            dot -Tpng docs/class_diagram.dot -o docs/class_diagram.png
-          fi
-
-      - name: Upload diagrama
-        uses: actions/upload-artifact@v4
-        with:
-          name: uml-diagram
-          path: artesanato/docs/class_diagram.png
-
-  code-smells-check:
-    name: "👃 Detector de Code Smells"
-    runs-on: ubuntu-latest
-    
-    steps:
     - uses: actions/checkout@v4
     - uses: actions/setup-python@v5
       with:
         python-version: '3.12'
-    
-    - name: Instalar ferramentas
+
+    - name: Instalar Graphviz
+      run: sudo apt-get update && sudo apt-get install -y graphviz
+
+    - name: Instalar dependências Python
       run: |
         cd artesanato
-        pip install pylint pylint-django radon
-    
-    - name: Configurar Django
+        pip install -r requirements.txt django-extensions pydotplus
+
+    - name: Gerar diagrama UML
       run: |
         cd artesanato
+
+        # Configurar Django
         export DJANGO_SETTINGS_MODULE="artesanato.settings"
         export PYTHONPATH="$PWD:$PYTHONPATH"
 
-    - name: Executar análise completa de code smells
-      run: |
-        cd artesanato
-        echo "🚀 ANÁLISE DE CODE SMELLS INICIADA"
-        echo "=================================="
-        echo -e "\n🔍 1. CODE SMELLS DE DESIGN (R09*):"
-        pylint --load-plugins pylint_django --disable=all --enable=R0901,R0902,R0903,R0912,R0913,R0914,R0915 api/ 2>&1 | tail -20 || true
-        echo -e "\n📏 2. PROBLEMAS DE FORMATAÇÃO (C03*):"
-        pylint --load-plugins pylint_django --disable=all --enable=C0301,C0302,C0303 api/ 2>&1 | tail -10 || true
-        echo -e "\n🏷️  3. PROBLEMAS DE NOMENCLATURA (C01*):"
-        pylint --load-plugins pylint_django --disable=all --enable=C0103,C0111,C0112 api/ 2>&1 | tail -10 || true
-        echo -e "\n📊 4. ESTATÍSTICAS GERAIS:"
-        pylint --load-plugins pylint_django --output-format=json api/ 2>&1 || true
-        echo -e "\n📈 5. ANÁLISE DE COMPLEXIDADE (RADON):"
-          radon cc api/ -a 2>&1 || true
-        echo -e "\n=================================="
-        echo "✅ ANÁLISE DE CODE SMELLS CONCLUÍDA"
-          
-        echo -e "\n=================================="
-        echo "✅ ANÁLISE DE CODE SMELLS CONCLUÍDA"
+        # Criar diretório
+        mkdir -p docs
+
+        # Gerar diagrama
+        echo "📊 Gerando diagrama UML com pydotplus..."
+        python manage.py graph_models api \
+          --output docs/class_diagram.png \
+          --theme django2018 \
+          --group-models \
+          --arrow-shape normal
+
+        # Verificar se gerou
+        if [ -f "docs/class_diagram.png" ]; then
+          echo "✅ Diagrama gerado com sucesso!"
+          ls -la docs/class_diagram.png
+        else
+          echo "⚠️  Não gerou PNG, tentando formato DOT..."
+          python manage.py graph_models api --dot > docs/class_diagram.dot
+          dot -Tpng docs/class_diagram.dot -o docs/class_diagram.png
+        fi
+
+    - name: Upload diagrama
+      uses: actions/upload-artifact@v4
+      with:
+        name: uml-diagram
+        path: artesanato/docs/class_diagram.png
