@@ -10,52 +10,52 @@ jobs:
   duplicate-check:
     name: "🔍 Detector de Código Duplicado"
     runs-on: ubuntu-latest
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    
-    - name: Instalar radon
-      run: pip install radon
-    
-    - name: Verificar duplicação no código real
-      run: |
-        cd artesanato
-        echo "=== DETECTOR DE CÓDIGO DUPLICADO ==="
-        echo "🔍 Analisando: api/"
-        radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar radon
+        run: pip install radon
+
+      - name: Verificar duplicação no código real
+        run: |
+          cd artesanato
+          echo "=== DETECTOR DE CÓDIGO DUPLICADO ==="
+          echo "🔍 Analisando: api/"
+          radon raw api/ --min D 2>&1 | grep -B1 -A1 "duplicate\|similar" && exit 1 || echo "✅ NENHUMA DUPLICAÇÃO ENCONTRADA - Código limpo!"
 
   lint:
     name: "📝 Análise de Código"
     runs-on: ubuntu-latest
     needs: duplicate-check
-    
+
     steps:
-    - uses: actions/checkout@v4
-    
-    - uses: actions/setup-python@v5
-      with:
-        python-version: '3.12'
-    
-    - name: Instalar dependências do projeto
-      run: |
-        cd artesanato
-        pip install -r requirements.txt
-    
-    - name: Verificar estilo PEP 8 com flake8
-      run: |
-        cd artesanato
-        pip install flake8
-        flake8 . --count --statistics
-  
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências do projeto
+        run: |
+          cd artesanato
+          pip install -r requirements.txt
+
+      - name: Verificar estilo PEP 8 com flake8
+        run: |
+          cd artesanato
+          pip install flake8
+          flake8 . --count --statistics
+
   test:
     name: "🧪 Testes"
     runs-on: ubuntu-latest
     needs: lint
-    
+
     services:
       postgres:
         image: postgres:15
@@ -71,39 +71,94 @@ jobs:
           - 5432:5432
 
     steps:
-    - uses: actions/checkout@v4
-    
-    - uses: actions/setup-python@v5
-      with: { python-version: '3.12' }
-    
-    - name: Instalar dependências
-      run: |
-        cd artesanato
-        pip install -r requirements.txt
-    
-    - name: Rodar migrações
-      run: |
-        cd artesanato
-        python manage.py migrate
-      env:
-        DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
-    
-    - name: Rodar testes
-      run: |
-        cd artesanato
-        python manage.py test
-      env:
-        DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
-    
-    - name: Verificar sintaxe Django
-      run: |
-        cd artesanato
-        python manage.py check
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar dependências
+        run: |
+          cd artesanato
+          pip install -r requirements.txt
+
+      - name: Rodar migrações
+        run: |
+          cd artesanato
+          python manage.py migrate
+        env:
+          DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+
+      - name: Rodar testes
+        run: |
+          cd artesanato
+          python manage.py test
+        env:
+          DATABASE_URL: postgresql://postgres:9061@localhost:5432/artesanato
+
+      - name: Verificar sintaxe Django
+        run: |
+          cd artesanato
+          python manage.py check
 
   uml-diagram:
     name: "📊 Gerar Diagrama UML"
     runs-on: ubuntu-latest
-    needs: test  # ⬅️ AGORA test JÁ EXISTE!
+    needs: test
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar Graphviz
+        run: sudo apt-get update && sudo apt-get install -y graphviz
+
+      - name: Instalar dependências Python
+        run: |
+          cd artesanato
+          pip install -r requirements.txt django-extensions pydotplus
+
+      - name: Gerar diagrama UML
+        run: |
+          cd artesanato
+
+          # Configurar Django
+          export DJANGO_SETTINGS_MODULE="artesanato.settings"
+          export PYTHONPATH="$PWD:$PYTHONPATH"
+
+          # Criar diretório
+          mkdir -p docs
+
+          # Gerar diagrama
+          echo "📊 Gerando diagrama UML com pydotplus..."
+          python manage.py graph_models api \
+            --output docs/class_diagram.png \
+            --theme django2018 \
+            --group-models \
+            --arrow-shape normal
+
+          # Verificar se gerou
+          if [ -f "docs/class_diagram.png" ]; then
+            echo "✅ Diagrama gerado com sucesso!"
+            ls -la docs/class_diagram.png
+          else
+            echo "⚠️  Não gerou PNG, tentando formato DOT..."
+            python manage.py graph_models api --dot > docs/class_diagram.dot
+            dot -Tpng docs/class_diagram.dot -o docs/class_diagram.png
+          fi
+
+      - name: Upload diagrama
+        uses: actions/upload-artifact@v4
+        with:
+          name: uml-diagram
+          path: artesanato/docs/class_diagram.png
+
+  code-smells-check:
+    name: "👃 Detector de Code Smells"
+    runs-on: ubuntu-latest
     
     steps:
     - uses: actions/checkout@v4
@@ -111,45 +166,34 @@ jobs:
       with:
         python-version: '3.12'
     
-    - name: Instalar Graphviz
-      run: sudo apt-get update && sudo apt-get install -y graphviz
-    
-    - name: Instalar dependências Python
+    - name: Instalar ferramentas
       run: |
         cd artesanato
-        pip install -r requirements.txt django-extensions pydotplus
+        pip install pylint pylint-django radon
     
-    - name: Gerar diagrama UML
+    - name: Configurar Django
       run: |
         cd artesanato
-        
-        # Configurar Django
         export DJANGO_SETTINGS_MODULE="artesanato.settings"
         export PYTHONPATH="$PWD:$PYTHONPATH"
-        
-        # Criar diretório
-        mkdir -p docs
-        
-        # Gerar diagrama
-        echo "📊 Gerando diagrama UML com pydotplus..."
-        python manage.py graph_models api \
-          --output docs/class_diagram.png \
-          --theme django2018 \
-          --group-models \
-          --arrow-shape normal
-        
-        # Verificar se gerou
-        if [ -f "docs/class_diagram.png" ]; then
-          echo "✅ Diagrama gerado com sucesso!"
-          ls -la docs/class_diagram.png
-        else
-          echo "⚠️  Não gerou PNG, tentando formato DOT..."
-          python manage.py graph_models api --dot > docs/class_diagram.dot
-          dot -Tpng docs/class_diagram.dot -o docs/class_diagram.png
-        fi
-    
-    - name: Upload diagrama
-      uses: actions/upload-artifact@v4
-      with:
-        name: uml-diagram
-        path: artesanato/docs/class_diagram.png
+
+    - name: Executar análise completa de code smells
+      run: |
+        cd artesanato
+        echo "🚀 ANÁLISE DE CODE SMELLS INICIADA"
+        echo "=================================="
+        echo -e "\n🔍 1. CODE SMELLS DE DESIGN (R09*):"
+        pylint --load-plugins pylint_django --disable=all --enable=R0901,R0902,R0903,R0912,R0913,R0914,R0915 api/ 2>&1 | tail -20 || true
+        echo -e "\n📏 2. PROBLEMAS DE FORMATAÇÃO (C03*):"
+        pylint --load-plugins pylint_django --disable=all --enable=C0301,C0302,C0303 api/ 2>&1 | tail -10 || true
+        echo -e "\n🏷️  3. PROBLEMAS DE NOMENCLATURA (C01*):"
+        pylint --load-plugins pylint_django --disable=all --enable=C0103,C0111,C0112 api/ 2>&1 | tail -10 || true
+        echo -e "\n📊 4. ESTATÍSTICAS GERAIS:"
+        pylint --load-plugins pylint_django --output-format=json api/ 2>&1 || true
+        echo -e "\n📈 5. ANÁLISE DE COMPLEXIDADE (RADON):"
+          radon cc api/ -a 2>&1 || true
+        echo -e "\n=================================="
+        echo "✅ ANÁLISE DE CODE SMELLS CONCLUÍDA"
+          
+        echo -e "\n=================================="
+        echo "✅ ANÁLISE DE CODE SMELLS CONCLUÍDA"
