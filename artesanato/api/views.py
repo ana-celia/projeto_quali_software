@@ -22,6 +22,7 @@ class BaseViewSet(mixins.CreateModelMixin,
     """
     pass
 
+
 # USAR BaseViewSet em vez de ModelViewSet
 class ClienteViewSet(BaseViewSet):
     queryset = Cliente.objects.all()
